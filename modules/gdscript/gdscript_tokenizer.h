@@ -112,6 +112,8 @@ public:
 			RETURN,
 			MATCH,
 			WHEN,
+			THEN,
+			ELTHEN,
 			// Keywords
 			AS,
 			ASSERT,

@@ -2728,6 +2728,14 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_binary_operator(Expression
 			operation->operation = BinaryOpNode::OP_COMP_GREATER_EQUAL;
 			operation->variant_op = Variant::OP_GREATER_EQUAL;
 			break;
+		// case GDScriptTokenizer::Token::THEN:
+		// 	operation->operation = BinaryOpNode::OP_NULL_COALESCING_THEN;
+		// 	operation->variant_op = Variant::OP_THEN;
+		// 	break;
+		// case GDScriptTokenizer::Token::ELTHEN:
+		// 	operation->operation = BinaryOpNode::OP_NULL_COALESCING_ELTHEN;
+		// 	operation->variant_op = Variant::OP_ELTHEN;
+		// 	break;
 		default:
 			return nullptr; // Unreachable.
 	}
@@ -2754,6 +2762,44 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_ternary_operator(Expressio
 
 	if (operation->false_expr == nullptr) {
 		push_error(R"(Expected expression after "else".)");
+	}
+
+	complete_extents(operation);
+	return operation;
+}
+
+GDScriptParser::ExpressionNode *GDScriptParser::parse_null_coalescing_operator(ExpressionNode *p_previous_operand, bool p_can_assign) {
+	// Only one ternary operation exists, so no abstraction here.
+	GDScriptTokenizer::Token op = previous;
+	TernaryOpNode *operation = alloc_node<TernaryOpNode>();
+	reset_extents(operation, p_previous_operand);
+	update_extents(operation);
+
+	Precedence precedence = (Precedence)(get_rule(op.type)->precedence + 1);
+	GDScriptParser::ExpressionNode* left = p_previous_operand;
+	GDScriptParser::ExpressionNode* right = parse_precedence(precedence, false);
+
+	if(right == nullptr){
+		push_error(R"(Expected expression after "then/elthen".)");
+	}
+
+	operation->condition = p_previous_operand;
+
+
+	switch (op.type)
+	{
+	case GDScriptTokenizer::Token::THEN:
+		operation->true_expr = right;
+		operation->false_expr = left;
+		break;
+	case GDScriptTokenizer::Token::ELTHEN:
+		operation->true_expr = left;
+		operation->false_expr = right;
+		break;
+
+	default:
+	//Won't go here
+		break;
 	}
 
 	complete_extents(operation);
@@ -3908,6 +3954,8 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // RETURN,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // MATCH,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // WHEN,
+		{ nullptr,                                          &GDScriptParser::parse_null_coalescing_operator,                                        PREC_TERNARY }, // THEN,
+		{ nullptr,                                          &GDScriptParser::parse_null_coalescing_operator,                                        PREC_TERNARY }, // ELTHEN,
 		// Keywords
 		{ nullptr,                                          &GDScriptParser::parse_cast,                 	PREC_CAST }, // AS,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // ASSERT,

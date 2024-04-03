@@ -469,6 +469,8 @@ public:
 			OP_COMP_LESS_EQUAL,
 			OP_COMP_GREATER,
 			OP_COMP_GREATER_EQUAL,
+			OP_NULL_COALESCING_THEN,
+			OP_NULL_COALESCING_ELTHEN,
 		};
 
 		OpType operation = OpType::OP_ADDITION;
@@ -1527,6 +1529,7 @@ private:
 	ExpressionNode *parse_binary_operator(ExpressionNode *p_previous_operand, bool p_can_assign);
 	ExpressionNode *parse_binary_not_in_operator(ExpressionNode *p_previous_operand, bool p_can_assign);
 	ExpressionNode *parse_ternary_operator(ExpressionNode *p_previous_operand, bool p_can_assign);
+	ExpressionNode *parse_null_coalescing_operator(ExpressionNode *p_previous_operand, bool p_can_assign);
 	ExpressionNode *parse_assignment(ExpressionNode *p_previous_operand, bool p_can_assign);
 	ExpressionNode *parse_array(ExpressionNode *p_previous_operand, bool p_can_assign);
 	ExpressionNode *parse_dictionary(ExpressionNode *p_previous_operand, bool p_can_assign);
