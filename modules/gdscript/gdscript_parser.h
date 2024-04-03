@@ -330,6 +330,8 @@ public:
 			UNARY_OPERATOR,
 			VARIABLE,
 			WHILE,
+			NULL_COAL_OPERATOR,
+			PREV
 		};
 
 		Type type = NONE;
@@ -469,8 +471,6 @@ public:
 			OP_COMP_LESS_EQUAL,
 			OP_COMP_GREATER,
 			OP_COMP_GREATER_EQUAL,
-			OP_NULL_COALESCING_THEN,
-			OP_NULL_COALESCING_ELTHEN,
 		};
 
 		OpType operation = OpType::OP_ADDITION;
@@ -1042,6 +1042,12 @@ public:
 		}
 	};
 
+	struct PrevNode : public ExpressionNode {
+		PrevNode() {
+			type = NULL_COAL_OPERATOR;
+		}
+	};
+
 	struct SignalNode : public Node {
 		IdentifierNode *identifier = nullptr;
 		Vector<ParameterNode *> parameters;
@@ -1192,6 +1198,23 @@ public:
 
 		TernaryOpNode() {
 			type = TERNARY_OPERATOR;
+		}
+	};
+
+	struct ThenOpNode : public ExpressionNode {
+
+		enum OpType {
+			OP_NULL_COALESCING_THEN,
+			OP_NULL_COALESCING_ELTHEN,
+		};
+		// Only one ternary operation exists, so no abstraction here.
+		ExpressionNode *left_operand = nullptr;
+		ExpressionNode *right_operand = nullptr;
+
+		OpType operation = OpType::OP_NULL_COALESCING_THEN;
+
+		ThenOpNode() {
+			type = NULL_COAL_OPERATOR;
 		}
 	};
 
@@ -1365,6 +1388,7 @@ private:
 	bool passed_cursor = false;
 	bool in_lambda = false;
 	bool lambda_ended = false; // Marker for when a lambda ends, to apply an end of statement if needed.
+	bool in_then_or_elthen = false;
 
 	typedef bool (GDScriptParser::*AnnotationAction)(const AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	struct AnnotationInfo {
@@ -1522,6 +1546,7 @@ private:
 	ExpressionNode *parse_literal(ExpressionNode *p_previous_operand, bool p_can_assign);
 	LiteralNode *parse_literal();
 	ExpressionNode *parse_self(ExpressionNode *p_previous_operand, bool p_can_assign);
+	ExpressionNode *parse_prev(ExpressionNode *p_previous_operand, bool p_can_assign);
 	ExpressionNode *parse_identifier(ExpressionNode *p_previous_operand, bool p_can_assign);
 	IdentifierNode *parse_identifier();
 	ExpressionNode *parse_builtin_constant(ExpressionNode *p_previous_operand, bool p_can_assign);

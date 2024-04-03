@@ -496,6 +496,18 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 			}
 			return GDScriptCodeGenerator::Address(GDScriptCodeGenerator::Address::SELF);
 		} break;
+		case GDScriptParser::Node::PREV: {
+			if(!codegen.then_node){
+				_set_error("'prev' not present in then expression!", p_expression);
+				r_error = ERR_COMPILATION_FAILED;
+				return GDScriptCodeGenerator::Address();
+			}
+
+			if (!p_initializer && codegen.locals.has("prev")) {
+				return codegen.locals["prev"];
+			}
+			return GDScriptCodeGenerator::Address();
+		} break;
 		case GDScriptParser::Node::ARRAY: {
 			const GDScriptParser::ArrayNode *an = static_cast<const GDScriptParser::ArrayNode *>(p_expression);
 			Vector<GDScriptCodeGenerator::Address> values;
@@ -946,6 +958,62 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 			gen->write_end_ternary();
 
 			return result;
+		} break;
+
+		case GDScriptParser::Node::NULL_COAL_OPERATOR: {
+			const GDScriptParser::ThenOpNode *then = static_cast<const GDScriptParser::ThenOpNode *>(p_expression);
+			if(codegen.then_node == nullptr){
+				codegen.then_node = then;
+				codegen.start_block();
+			}
+
+			codegen.then_node = then;
+			GDScriptCodeGenerator::Address prev = codegen.add_local("prev", _gdtype_from_datatype(then->get_datatype(), codegen.script));
+
+			switch (then->operation)
+			{
+				case GDScriptParser::ThenOpNode::OP_NULL_COALESCING_THEN:{
+					gen->write_start_then(prev);
+					// OR operator with early out on success.
+					GDScriptCodeGenerator::Address left_operand = _parse_expression(codegen, r_error, then->left_operand);
+					gen->write_then_left_operand(left_operand);
+					GDScriptCodeGenerator::Address right_operand = _parse_expression(codegen, r_error, then->right_operand);
+					gen->write_then_right_operand(right_operand);
+
+					gen->write_end_then();
+
+					if (right_operand.mode == GDScriptCodeGenerator::Address::TEMPORARY) {
+						gen->pop_temporary();
+					}
+					if (left_operand.mode == GDScriptCodeGenerator::Address::TEMPORARY) {
+						gen->pop_temporary();
+					}
+				}
+				break;
+
+				case GDScriptParser::ThenOpNode::OP_NULL_COALESCING_ELTHEN:{
+					gen->write_start_elthen(prev);
+					// OR operator with early out on success.
+					GDScriptCodeGenerator::Address left_operand = _parse_expression(codegen, r_error, then->left_operand);
+					gen->write_elthen_left_operand(left_operand);
+					GDScriptCodeGenerator::Address right_operand = _parse_expression(codegen, r_error, then->right_operand);
+					gen->write_elthen_right_operand(right_operand);
+
+					gen->write_end_elthen();
+
+					if (right_operand.mode == GDScriptCodeGenerator::Address::TEMPORARY) {
+						gen->pop_temporary();
+					}
+					if (left_operand.mode == GDScriptCodeGenerator::Address::TEMPORARY) {
+						gen->pop_temporary();
+					}
+				}
+				break;
+
+				default:
+					break;
+			}
+			codegen.then_node = nullptr;
 		} break;
 		case GDScriptParser::Node::TYPE_TEST: {
 			const GDScriptParser::TypeTestNode *type_test = static_cast<const GDScriptParser::TypeTestNode *>(p_expression);

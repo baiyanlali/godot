@@ -114,6 +114,7 @@ public:
 			WHEN,
 			THEN,
 			ELTHEN,
+			PREV,
 			// Keywords
 			AS,
 			ASSERT,

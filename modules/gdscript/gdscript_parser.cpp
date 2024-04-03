@@ -2543,6 +2543,15 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_self(ExpressionNode *p_pre
 	return self;
 }
 
+GDScriptParser::ExpressionNode *GDScriptParser::parse_prev(ExpressionNode *p_previous_operand, bool p_can_assign) {
+	if (!in_then_or_elthen) {
+		push_error(R"(Cannot use "prev" outside then/elthen expression.)");
+	}
+	PrevNode *prev = alloc_node<PrevNode>();
+	complete_extents(prev);
+	return prev;
+}
+
 GDScriptParser::ExpressionNode *GDScriptParser::parse_builtin_constant(ExpressionNode *p_previous_operand, bool p_can_assign) {
 	GDScriptTokenizer::Token::Type op_type = previous.type;
 	LiteralNode *constant = alloc_node<LiteralNode>();
@@ -2728,14 +2737,6 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_binary_operator(Expression
 			operation->operation = BinaryOpNode::OP_COMP_GREATER_EQUAL;
 			operation->variant_op = Variant::OP_GREATER_EQUAL;
 			break;
-		// case GDScriptTokenizer::Token::THEN:
-		// 	operation->operation = BinaryOpNode::OP_NULL_COALESCING_THEN;
-		// 	operation->variant_op = Variant::OP_THEN;
-		// 	break;
-		// case GDScriptTokenizer::Token::ELTHEN:
-		// 	operation->operation = BinaryOpNode::OP_NULL_COALESCING_ELTHEN;
-		// 	operation->variant_op = Variant::OP_ELTHEN;
-		// 	break;
 		default:
 			return nullptr; // Unreachable.
 	}
@@ -2771,30 +2772,29 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_ternary_operator(Expressio
 GDScriptParser::ExpressionNode *GDScriptParser::parse_null_coalescing_operator(ExpressionNode *p_previous_operand, bool p_can_assign) {
 	// Only one ternary operation exists, so no abstraction here.
 	GDScriptTokenizer::Token op = previous;
-	TernaryOpNode *operation = alloc_node<TernaryOpNode>();
+	ThenOpNode *operation = alloc_node<ThenOpNode>();
 	reset_extents(operation, p_previous_operand);
 	update_extents(operation);
 
-	Precedence precedence = (Precedence)(get_rule(op.type)->precedence + 1);
-	GDScriptParser::ExpressionNode* left = p_previous_operand;
-	GDScriptParser::ExpressionNode* right = parse_precedence(precedence, false);
+	in_then_or_elthen = true;
 
-	if(right == nullptr){
+	Precedence precedence = (Precedence)(get_rule(op.type)->precedence + 1);
+	operation->left_operand = p_previous_operand;
+	operation->right_operand = parse_precedence(precedence, false);
+
+	complete_extents(operation);
+
+	if(operation->right_operand == nullptr){
 		push_error(R"(Expected expression after "then/elthen".)");
 	}
-
-	operation->condition = p_previous_operand;
-
 
 	switch (op.type)
 	{
 	case GDScriptTokenizer::Token::THEN:
-		operation->true_expr = right;
-		operation->false_expr = left;
+		operation->operation = ThenOpNode::OP_NULL_COALESCING_THEN;
 		break;
 	case GDScriptTokenizer::Token::ELTHEN:
-		operation->true_expr = left;
-		operation->false_expr = right;
+		operation->operation = ThenOpNode::OP_NULL_COALESCING_ELTHEN;
 		break;
 
 	default:
@@ -2802,7 +2802,8 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_null_coalescing_operator(E
 		break;
 	}
 
-	complete_extents(operation);
+	in_then_or_elthen = false;
+
 	return operation;
 }
 
@@ -3956,6 +3957,7 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // WHEN,
 		{ nullptr,                                          &GDScriptParser::parse_null_coalescing_operator,                                        PREC_TERNARY }, // THEN,
 		{ nullptr,                                          &GDScriptParser::parse_null_coalescing_operator,                                        PREC_TERNARY }, // ELTHEN,
+		{ &GDScriptParser::parse_prev,                   	nullptr,                                        PREC_NONE }, // PREV,
 		// Keywords
 		{ nullptr,                                          &GDScriptParser::parse_cast,                 	PREC_CAST }, // AS,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // ASSERT,

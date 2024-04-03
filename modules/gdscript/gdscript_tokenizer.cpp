@@ -102,6 +102,7 @@ static const char *token_names[] = {
 	"when", // WHEN,
 	"then", // THEN,
 	"elthen", // ELTHEN
+	"prev",
 	// Keywords
 	"as", // AS,
 	"assert", // ASSERT,
@@ -549,6 +550,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("NAN", Token::CONST_NAN)         \
 	KEYWORD_GROUP('P')                       \
 	KEYWORD("PI", Token::CONST_PI)           \
+	KEYWORD("prev", Token::PREV)           \
 	KEYWORD_GROUP('T')                       \
 	KEYWORD("TAU", Token::CONST_TAU)
 

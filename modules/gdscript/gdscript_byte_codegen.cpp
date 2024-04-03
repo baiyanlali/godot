@@ -720,6 +720,80 @@ void GDScriptByteCodeGenerator::write_end_or(const Address &p_target) {
 	append(p_target);
 }
 
+void GDScriptByteCodeGenerator::write_start_then(const Address &p_target) {
+	then_result.push_back(p_target);
+}
+
+void GDScriptByteCodeGenerator::write_then_left_operand(const Address &p_left_operand) {
+	append_opcode(GDScriptFunction::OPCODE_JUMP_IF_NOT);
+	append(p_left_operand);
+
+	then_left_ptr.push_back(p_left_operand);
+
+	then_jump_pos.push_back(opcodes.size());
+	append(0); // Jump target, will be patched.
+}
+
+void GDScriptByteCodeGenerator::write_then_right_operand(const Address &p_right_operand) {
+	then_right_ptr.push_back(p_right_operand);
+}
+
+void GDScriptByteCodeGenerator::write_end_then() {
+	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
+	append(then_result.back()->get());
+	append(then_left_ptr.back()->get());
+
+	append_opcode(GDScriptFunction::OPCODE_JUMP);
+	append(opcodes.size() + 4);
+
+	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
+	append(then_left_ptr.back()->get());
+	append(then_right_ptr.back()->get());
+	patch_jump(then_jump_pos.back()->get());
+
+	then_jump_pos.pop_back();
+	then_left_ptr.pop_back();
+	then_right_ptr.pop_back();
+	then_result.pop_back();
+}
+
+void GDScriptByteCodeGenerator::write_start_elthen(const Address &p_target) {
+	elthen_result.push_back(p_target);
+}
+
+void GDScriptByteCodeGenerator::write_elthen_left_operand(const Address &p_left_operand) {
+	append_opcode(GDScriptFunction::OPCODE_JUMP_IF_NOT);
+	append(p_left_operand);
+
+	elthen_left_ptr.push_back(p_left_operand);
+
+	elthen_jump_pos.push_back(opcodes.size());
+	append(0); // Jump target, will be patched.
+}
+
+void GDScriptByteCodeGenerator::write_elthen_right_operand(const Address &p_right_operand) {
+	elthen_right_ptr.push_back(p_right_operand);
+}
+
+void GDScriptByteCodeGenerator::write_end_elthen() {
+	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
+	append(elthen_result.back()->get());
+	append(elthen_left_ptr.back()->get());
+
+	append_opcode(GDScriptFunction::OPCODE_JUMP);
+	append(opcodes.size() + 4);
+
+	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
+	append(elthen_left_ptr.back()->get());
+	append(elthen_right_ptr.back()->get());
+	patch_jump(elthen_jump_pos.back()->get());
+
+	elthen_jump_pos.pop_back();
+	elthen_left_ptr.pop_back();
+	elthen_right_ptr.pop_back();
+	elthen_result.pop_back();
+}
+
 void GDScriptByteCodeGenerator::write_start_ternary(const Address &p_target) {
 	ternary_result.push_back(p_target);
 }
@@ -732,6 +806,8 @@ void GDScriptByteCodeGenerator::write_ternary_condition(const Address &p_conditi
 }
 
 void GDScriptByteCodeGenerator::write_ternary_true_expr(const Address &p_expr) {
+	// a = haha if true else lala if true else caca
+	// a = true then haha elthen lala
 	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
 	append(ternary_result.back()->get());
 	append(p_expr);

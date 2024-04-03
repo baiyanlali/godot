@@ -1498,10 +1498,12 @@ void GDScriptAnalyzer::resolve_node(GDScriptParser::Node *p_node, bool p_is_root
 		case GDScriptParser::Node::LITERAL:
 		case GDScriptParser::Node::PRELOAD:
 		case GDScriptParser::Node::SELF:
+		case GDScriptParser::Node::PREV:
 		case GDScriptParser::Node::SUBSCRIPT:
 		case GDScriptParser::Node::TERNARY_OPERATOR:
 		case GDScriptParser::Node::TYPE_TEST:
 		case GDScriptParser::Node::UNARY_OPERATOR:
+		case GDScriptParser::Node::NULL_COAL_OPERATOR:
 			reduce_expression(static_cast<GDScriptParser::ExpressionNode *>(p_node), p_is_root);
 			break;
 		case GDScriptParser::Node::BREAK:
@@ -4226,6 +4228,16 @@ void GDScriptAnalyzer::reduce_self(GDScriptParser::SelfNode *p_self) {
 	p_self->is_constant = false;
 	p_self->set_datatype(type_from_metatype(parser->current_class->get_datatype()));
 	mark_lambda_use_self();
+}
+
+void GDScriptAnalyzer::reduce_prev(GDScriptParser::PrevNode *p_prev) {
+	// p_prev->is_constant = false;
+	// // p_prev->set_datatype(type_from_metatype(parser->current_class->get_datatype()));
+	// p_prev->set_datatype(type_from_metatype(GDScriptParser::DataType::VARIANT));
+}
+
+void GDScriptAnalyzer::reduce_null_coal_op(GDScriptParser::ThenOpNode *p_then_op) {
+
 }
 
 void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscript, bool p_can_be_pseudo_type) {

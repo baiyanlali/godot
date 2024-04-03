@@ -76,6 +76,7 @@ class GDScriptCompiler {
 		GDScript *script = nullptr;
 		const GDScriptParser::ClassNode *class_node = nullptr;
 		const GDScriptParser::FunctionNode *function_node = nullptr;
+		const GDScriptParser::ThenOpNode *then_node = nullptr;
 		StringName function_name;
 		GDScriptCodeGenerator *generator = nullptr;
 		HashMap<StringName, GDScriptCodeGenerator::Address> parameters;

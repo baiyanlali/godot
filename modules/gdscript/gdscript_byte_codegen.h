@@ -155,6 +155,16 @@ class GDScriptByteCodeGenerator : public GDScriptCodeGenerator {
 	List<int> ternary_jump_fail_pos;
 	List<int> ternary_jump_skip_pos;
 
+	List<int> then_jump_pos;
+	List<Address> then_left_ptr;
+	List<Address> then_right_ptr;
+	List<Address> then_result;
+
+	List<int> elthen_jump_pos;
+	List<Address> elthen_left_ptr;
+	List<Address> elthen_right_ptr;
+	List<Address> elthen_result;
+
 	List<List<int>> current_breaks_to_patch;
 
 	void add_stack_identifier(const StringName &p_id, int p_stackpos) {
@@ -481,6 +491,14 @@ public:
 	virtual void write_or_left_operand(const Address &p_left_operand) override;
 	virtual void write_or_right_operand(const Address &p_right_operand) override;
 	virtual void write_end_or(const Address &p_target) override;
+	virtual void write_start_then(const Address &p_left_operand) override;
+	virtual void write_then_left_operand(const Address &p_left_operand) override;
+	virtual void write_then_right_operand(const Address &p_left_operand) override;
+	virtual void write_end_then() override;
+	virtual void write_start_elthen(const Address &p_left_operand) override;
+	virtual void write_elthen_left_operand(const Address &p_left_operand) override;
+	virtual void write_elthen_right_operand(const Address &p_left_operand) override;
+	virtual void write_end_elthen() override;
 	virtual void write_start_ternary(const Address &p_target) override;
 	virtual void write_ternary_condition(const Address &p_condition) override;
 	virtual void write_ternary_true_expr(const Address &p_expr) override;
