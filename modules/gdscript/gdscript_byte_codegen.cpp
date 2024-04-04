@@ -741,15 +741,15 @@ void GDScriptByteCodeGenerator::write_then_right_operand(const Address &p_right_
 void GDScriptByteCodeGenerator::write_end_then() {
 	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
 	append(then_result.back()->get());
-	append(then_left_ptr.back()->get());
+	append(then_right_ptr.back()->get());
 
 	append_opcode(GDScriptFunction::OPCODE_JUMP);
 	append(opcodes.size() + 4);
 
-	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
-	append(then_left_ptr.back()->get());
-	append(then_right_ptr.back()->get());
 	patch_jump(then_jump_pos.back()->get());
+	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
+	append(then_result.back()->get());
+	append(then_left_ptr.back()->get());
 
 	then_jump_pos.pop_back();
 	then_left_ptr.pop_back();
@@ -766,7 +766,6 @@ void GDScriptByteCodeGenerator::write_elthen_left_operand(const Address &p_left_
 	append(p_left_operand);
 
 	elthen_left_ptr.push_back(p_left_operand);
-
 	elthen_jump_pos.push_back(opcodes.size());
 	append(0); // Jump target, will be patched.
 }
@@ -783,10 +782,11 @@ void GDScriptByteCodeGenerator::write_end_elthen() {
 	append_opcode(GDScriptFunction::OPCODE_JUMP);
 	append(opcodes.size() + 4);
 
-	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
-	append(elthen_left_ptr.back()->get());
-	append(elthen_right_ptr.back()->get());
 	patch_jump(elthen_jump_pos.back()->get());
+	append_opcode(GDScriptFunction::OPCODE_ASSIGN);
+	append(elthen_result.back()->get());
+	append(elthen_right_ptr.back()->get());
+
 
 	elthen_jump_pos.pop_back();
 	elthen_left_ptr.pop_back();

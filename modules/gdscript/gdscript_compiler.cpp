@@ -964,17 +964,19 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 			const GDScriptParser::ThenOpNode *then = static_cast<const GDScriptParser::ThenOpNode *>(p_expression);
 			if(codegen.then_node == nullptr){
 				codegen.then_node = then;
-				codegen.start_block();
 			}
 
+			// GDScriptCodeGenerator::Address result = codegen.add_temporary(_gdtype_from_datatype(then->get_datatype(), codegen.script));
+			GDScriptCodeGenerator::Address result = codegen.add_local("prev", _gdtype_from_datatype(then->get_datatype(), codegen.script));
+
+
 			codegen.then_node = then;
-			GDScriptCodeGenerator::Address prev = codegen.add_local("prev", _gdtype_from_datatype(then->get_datatype(), codegen.script));
+			// GDScriptCodeGenerator::Address prev = codegen.add_local("prev", _gdtype_from_datatype(then->get_datatype(), codegen.script));
 
 			switch (then->operation)
 			{
 				case GDScriptParser::ThenOpNode::OP_NULL_COALESCING_THEN:{
-					gen->write_start_then(prev);
-					// OR operator with early out on success.
+					gen->write_start_then(result);
 					GDScriptCodeGenerator::Address left_operand = _parse_expression(codegen, r_error, then->left_operand);
 					gen->write_then_left_operand(left_operand);
 					GDScriptCodeGenerator::Address right_operand = _parse_expression(codegen, r_error, then->right_operand);
@@ -992,11 +994,11 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 				break;
 
 				case GDScriptParser::ThenOpNode::OP_NULL_COALESCING_ELTHEN:{
-					gen->write_start_elthen(prev);
+					gen->write_start_elthen(result);
 					// OR operator with early out on success.
 					GDScriptCodeGenerator::Address left_operand = _parse_expression(codegen, r_error, then->left_operand);
-					gen->write_elthen_left_operand(left_operand);
 					GDScriptCodeGenerator::Address right_operand = _parse_expression(codegen, r_error, then->right_operand);
+					gen->write_elthen_left_operand(left_operand);
 					gen->write_elthen_right_operand(right_operand);
 
 					gen->write_end_elthen();
@@ -1014,6 +1016,8 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 					break;
 			}
 			codegen.then_node = nullptr;
+
+			return result;
 		} break;
 		case GDScriptParser::Node::TYPE_TEST: {
 			const GDScriptParser::TypeTestNode *type_test = static_cast<const GDScriptParser::TypeTestNode *>(p_expression);
