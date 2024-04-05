@@ -133,9 +133,13 @@ uint32_t GDScriptByteCodeGenerator::add_temporary(const GDScriptDataType &p_type
 	return slot;
 }
 
+
 void GDScriptByteCodeGenerator::pop_temporary() {
+	printf("\t\tTry to remove... is empty: %s\n", used_temporaries.is_empty()?"true":"false");
 	ERR_FAIL_COND(used_temporaries.is_empty());
 	int slot_idx = used_temporaries.back()->get();
+
+	printf("\t\tTry to remove...%d, is empty: %s\n", (slot_idx  & GDScriptFunction::ADDR_MASK), used_temporaries.is_empty()?"true":"false");
 	const StackSlot &slot = temporaries[slot_idx];
 	if (slot.type == Variant::NIL) {
 		// Avoid keeping in the stack long-lived references to objects,
@@ -147,6 +151,7 @@ void GDScriptByteCodeGenerator::pop_temporary() {
 	temporaries_pool[slot.type].push_back(slot_idx);
 	used_temporaries.pop_back();
 }
+
 
 void GDScriptByteCodeGenerator::start_parameters() {
 	if (function->_default_arg_count > 0) {

@@ -5322,6 +5322,12 @@ void GDScriptParser::TreePrinter::print_expression(ExpressionNode *p_expression)
 		case Node::UNARY_OPERATOR:
 			print_unary_op(static_cast<UnaryOpNode *>(p_expression));
 			break;
+		case Node::PREV:
+			print_prev(static_cast<PrevNode *>(p_expression));
+			break;
+		case Node::NULL_COAL_OPERATOR:
+			print_null_coal(static_cast<ThenOpNode *>(p_expression));
+			break;
 		default:
 			push_text(vformat("<unknown expression %d>", p_expression->type));
 			break;
@@ -5574,6 +5580,28 @@ void GDScriptParser::TreePrinter::print_self(SelfNode *p_self) {
 	} else {
 		push_text("<main class>");
 	}
+	push_text(")");
+}
+
+void GDScriptParser::TreePrinter::print_prev(PrevNode *p_prev) {
+	push_text("Prev");
+}
+
+void GDScriptParser::TreePrinter::print_null_coal(ThenOpNode *p_then) {
+
+	push_text("(");
+	print_expression(p_then->left_operand);
+		switch(p_then->operation){
+		case ThenOpNode::OP_NULL_COALESCING_THEN: {
+			push_text(") Then (");
+		}
+		break;
+		case ThenOpNode::OP_NULL_COALESCING_ELTHEN: {
+			push_text(") Elthen (");
+		}
+		break;
+	}
+	print_expression(p_then->right_operand);
 	push_text(")");
 }
 

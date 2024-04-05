@@ -76,12 +76,14 @@ class GDScriptCompiler {
 		GDScript *script = nullptr;
 		const GDScriptParser::ClassNode *class_node = nullptr;
 		const GDScriptParser::FunctionNode *function_node = nullptr;
-		const GDScriptParser::ThenOpNode *then_node = nullptr;
+		int then_node_cnt = 0;
 		StringName function_name;
 		GDScriptCodeGenerator *generator = nullptr;
 		HashMap<StringName, GDScriptCodeGenerator::Address> parameters;
 		HashMap<StringName, GDScriptCodeGenerator::Address> locals;
 		List<HashMap<StringName, GDScriptCodeGenerator::Address>> locals_stack;
+
+		GDScriptCodeGenerator::Address prev_address;
 		bool is_static = false;
 
 		GDScriptCodeGenerator::Address add_local(const StringName &p_name, const GDScriptDataType &p_type) {

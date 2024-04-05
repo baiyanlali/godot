@@ -102,7 +102,7 @@ static const char *token_names[] = {
 	"when", // WHEN,
 	"then", // THEN,
 	"elthen", // ELTHEN
-	"prev",
+	"prev", // PREV
 	// Keywords
 	"as", // AS,
 	"assert", // ASSERT,
@@ -172,6 +172,7 @@ bool GDScriptTokenizer::Token::can_precede_bin_op() const {
 		case IDENTIFIER:
 		case LITERAL:
 		case SELF:
+		case PREV:
 		case BRACKET_CLOSE:
 		case BRACE_CLOSE:
 		case PARENTHESIS_CLOSE:
@@ -238,6 +239,7 @@ bool GDScriptTokenizer::Token::is_node_name() const {
 		case PRELOAD:
 		case RETURN:
 		case SELF:
+		case PREV:
 		case SIGNAL:
 		case STATIC:
 		case SUPER:
@@ -506,7 +508,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD_GROUP('e')                       \
 	KEYWORD("elif", Token::ELIF)             \
 	KEYWORD("else", Token::ELSE)             \
-	KEYWORD("elthen", Token::ELTHEN)             \
+	KEYWORD("elthen", Token::ELTHEN)         \
 	KEYWORD("enum", Token::ENUM)             \
 	KEYWORD("extends", Token::EXTENDS)       \
 	KEYWORD_GROUP('f')                       \
@@ -526,6 +528,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD_GROUP('p')                       \
 	KEYWORD("pass", Token::PASS)             \
 	KEYWORD("preload", Token::PRELOAD)       \
+	KEYWORD("prev", Token::PREV)             \
 	KEYWORD_GROUP('r')                       \
 	KEYWORD("return", Token::RETURN)         \
 	KEYWORD_GROUP('s')                       \
@@ -535,7 +538,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("super", Token::SUPER)           \
 	KEYWORD_GROUP('t')                       \
 	KEYWORD("trait", Token::TRAIT)           \
-	KEYWORD("then", Token::THEN)           \
+	KEYWORD("then", Token::THEN)             \
 	KEYWORD_GROUP('v')                       \
 	KEYWORD("var", Token::VAR)               \
 	KEYWORD("void", Token::VOID)             \
@@ -550,7 +553,6 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("NAN", Token::CONST_NAN)         \
 	KEYWORD_GROUP('P')                       \
 	KEYWORD("PI", Token::CONST_PI)           \
-	KEYWORD("prev", Token::PREV)           \
 	KEYWORD_GROUP('T')                       \
 	KEYWORD("TAU", Token::CONST_TAU)
 
@@ -618,7 +620,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::potential_identifier() {
 		const int keyword_length = sizeof(keyword) - 1;                                                                   \
 		static_assert(keyword_length <= MAX_KEYWORD_LENGTH, "There's a keyword longer than the defined maximum length");  \
 		static_assert(keyword_length >= MIN_KEYWORD_LENGTH, "There's a keyword shorter than the defined minimum length"); \
-		if (keyword_length == len && name == keyword) {                                                                   \
+		if (keyword_length == len && name == keyword) {\
 			Token kw = make_token(token_type);                                                                            \
 			kw.literal = name;                                                                                            \
 			return kw;                                                                                                    \

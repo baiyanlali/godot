@@ -1044,7 +1044,7 @@ public:
 
 	struct PrevNode : public ExpressionNode {
 		PrevNode() {
-			type = NULL_COAL_OPERATOR;
+			type = PREV;
 		}
 	};
 
@@ -1651,6 +1651,8 @@ public:
 		void print_preload(PreloadNode *p_preload);
 		void print_return(ReturnNode *p_return);
 		void print_self(SelfNode *p_self);
+		void print_prev(PrevNode *p_prev);
+		void print_null_coal(ThenOpNode *p_then);
 		void print_signal(SignalNode *p_signal);
 		void print_statement(Node *p_statement);
 		void print_subscript(SubscriptNode *p_subscript);

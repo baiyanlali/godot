@@ -39,6 +39,11 @@
 #include "core/config/project_settings.h"
 #include "core/core_string_names.h"
 
+#define pop_temporary() gen->pop_temporary(__func__, __FILE__, __LINE__)
+#define codegenpop_temporary() gen->pop_temporary(__func__, __FILE__, __LINE__)
+
+// #define codegen.generator->pop_temporary() codegen.generator->pop_temporary(__func__, __FILE__, __LINE__)
+
 bool GDScriptCompiler::_is_class_member_property(CodeGen &codegen, const StringName &p_name) {
 	if (codegen.function_node && codegen.function_node->is_static) {
 		return false;
@@ -250,7 +255,7 @@ static bool _can_use_validate_call(const MethodBind *p_method, const Vector<GDSc
 	return true;
 }
 
-GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &codegen, Error &r_error, const GDScriptParser::ExpressionNode *p_expression, bool p_root, bool p_initializer, const GDScriptCodeGenerator::Address &p_index_addr) {
+GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &codegen, Error &r_error, const GDScriptParser:: ExpressionNode *p_expression, bool p_root, bool p_initializer, const GDScriptCodeGenerator::Address &p_index_addr) {
 	if (p_expression->is_constant && !(p_expression->get_datatype().is_meta_type && p_expression->get_datatype().kind == GDScriptParser::DataType::CLASS)) {
 		return codegen.add_constant(p_expression->reduced_value);
 	}
@@ -495,18 +500,6 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 				return GDScriptCodeGenerator::Address();
 			}
 			return GDScriptCodeGenerator::Address(GDScriptCodeGenerator::Address::SELF);
-		} break;
-		case GDScriptParser::Node::PREV: {
-			if(!codegen.then_node){
-				_set_error("'prev' not present in then expression!", p_expression);
-				r_error = ERR_COMPILATION_FAILED;
-				return GDScriptCodeGenerator::Address();
-			}
-
-			if (!p_initializer && codegen.locals.has("prev")) {
-				return codegen.locals["prev"];
-			}
-			return GDScriptCodeGenerator::Address();
 		} break;
 		case GDScriptParser::Node::ARRAY: {
 			const GDScriptParser::ArrayNode *an = static_cast<const GDScriptParser::ArrayNode *>(p_expression);
@@ -959,35 +952,49 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 
 			return result;
 		} break;
-
+		case GDScriptParser::Node::PREV: {
+			if(codegen.then_node_cnt <= 0){
+				_set_error("'prev' not present in then expression!\n", p_expression);
+				r_error = ERR_COMPILATION_FAILED;
+				return GDScriptCodeGenerator::Address();
+			}
+			return codegen.prev_address;
+		} break;
 		case GDScriptParser::Node::NULL_COAL_OPERATOR: {
 			const GDScriptParser::ThenOpNode *then = static_cast<const GDScriptParser::ThenOpNode *>(p_expression);
-			if(codegen.then_node == nullptr){
-				codegen.then_node = then;
-			}
-
-			// GDScriptCodeGenerator::Address result = codegen.add_temporary(_gdtype_from_datatype(then->get_datatype(), codegen.script));
-			GDScriptCodeGenerator::Address result = codegen.add_local("prev", _gdtype_from_datatype(then->get_datatype(), codegen.script));
 
 
-			codegen.then_node = then;
+			GDScriptCodeGenerator::Address result = codegen.add_temporary(_gdtype_from_datatype(then->get_datatype(), codegen.script));
+			// GDScriptCodeGenerator::Address result = codegen.add_local("prev", _gdtype_from_datatype(then->get_datatype(), codegen.script));
+			// codegen.prev_address = result;
+
 			// GDScriptCodeGenerator::Address prev = codegen.add_local("prev", _gdtype_from_datatype(then->get_datatype(), codegen.script));
 
 			switch (then->operation)
 			{
 				case GDScriptParser::ThenOpNode::OP_NULL_COALESCING_THEN:{
+					printf("enter then\n");
+					codegen.then_node_cnt ++;
 					gen->write_start_then(result);
 					GDScriptCodeGenerator::Address left_operand = _parse_expression(codegen, r_error, then->left_operand);
+					codegen.prev_address = left_operand;
+					printf("\t left slot: %d\n", (codegen.prev_address.address  & GDScriptFunction::ADDR_MASK));
 					gen->write_then_left_operand(left_operand);
+					printf("\t finish write left:\n");
 					GDScriptCodeGenerator::Address right_operand = _parse_expression(codegen, r_error, then->right_operand);
+					printf("\t finish parse right:\n");
 					gen->write_then_right_operand(right_operand);
+					printf("\t finish write right:\n");
 
 					gen->write_end_then();
+					printf("\t finish write end:\n");
 
 					if (right_operand.mode == GDScriptCodeGenerator::Address::TEMPORARY) {
+						printf("\tremove right\n");
 						gen->pop_temporary();
 					}
 					if (left_operand.mode == GDScriptCodeGenerator::Address::TEMPORARY) {
+						printf("\tremove left\n");
 						gen->pop_temporary();
 					}
 				}
@@ -1015,8 +1022,8 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 				default:
 					break;
 			}
-			codegen.then_node = nullptr;
-
+			codegen.then_node_cnt--;
+			printf("end then\n");
 			return result;
 		} break;
 		case GDScriptParser::Node::TYPE_TEST: {
