@@ -100,6 +100,9 @@ static const char *token_names[] = {
 	"return", // RETURN,
 	"match", // MATCH,
 	"when", // WHEN,
+	"then", // THEN,
+	"elthen", // ELTHEN,
+	"prev", // PREV
 	// Keywords
 	"as", // AS,
 	"assert", // ASSERT,
@@ -245,6 +248,9 @@ bool GDScriptTokenizer::Token::is_node_name() const {
 		case WHILE:
 		case WHEN:
 		case YIELD:
+		case THEN:
+		case ELTHEN:
+		case PREV:
 			return true;
 		default:
 			return false;
@@ -501,6 +507,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD_GROUP('e')                       \
 	KEYWORD("elif", Token::ELIF)             \
 	KEYWORD("else", Token::ELSE)             \
+	KEYWORD("elthen", Token::ELTHEN)         \
 	KEYWORD("enum", Token::ENUM)             \
 	KEYWORD("extends", Token::EXTENDS)       \
 	KEYWORD_GROUP('f')                       \
@@ -519,6 +526,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("or", Token::OR)                 \
 	KEYWORD_GROUP('p')                       \
 	KEYWORD("pass", Token::PASS)             \
+	KEYWORD("prev", Token::PREV)             \
 	KEYWORD("preload", Token::PRELOAD)       \
 	KEYWORD_GROUP('r')                       \
 	KEYWORD("return", Token::RETURN)         \
@@ -529,6 +537,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("super", Token::SUPER)           \
 	KEYWORD_GROUP('t')                       \
 	KEYWORD("trait", Token::TRAIT)           \
+	KEYWORD("then", Token::THEN)       	     \
 	KEYWORD_GROUP('v')                       \
 	KEYWORD("var", Token::VAR)               \
 	KEYWORD("void", Token::VOID)             \
