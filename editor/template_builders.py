@@ -16,15 +16,15 @@ def parse_template(inherits, source, delimiter):
     meta_prefix = delimiter + " meta-"
     meta = ["name", "description", "version", "space-indent"]
 
-    with open(source) as f:
+    with open(source, "r", encoding="utf-8") as f:
         lines = f.readlines()
         for line in lines:
             if line.startswith(meta_prefix):
                 line = line[len(meta_prefix) :]
                 for m in meta:
                     if line.startswith(m):
-                        strip_lenght = len(m) + 1
-                        script_template[m] = line[strip_lenght:].strip()
+                        strip_length = len(m) + 1
+                        script_template[m] = line[strip_length:].strip()
             else:
                 script_template["script"] += line
         if script_template["space-indent"] != "":

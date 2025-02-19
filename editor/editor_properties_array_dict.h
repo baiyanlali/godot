@@ -33,10 +33,10 @@
 
 #include "editor/editor_inspector.h"
 #include "editor/editor_locale_dialog.h"
-#include "editor/filesystem_dock.h"
 
 class Button;
 class EditorSpinSlider;
+class MarginContainer;
 
 class EditorPropertyArrayObject : public RefCounted {
 	GDCLASS(EditorPropertyArrayObject, RefCounted);
@@ -48,6 +48,10 @@ protected:
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 
 public:
+	enum {
+		NOT_CHANGING_TYPE = -1,
+	};
+
 	void set_array(const Variant &p_array);
 	Variant get_array();
 
@@ -67,10 +71,12 @@ protected:
 
 public:
 	enum {
-		NEW_KEY_INDEX = -2,
+		NOT_CHANGING_TYPE = -3,
+		NEW_KEY_INDEX,
 		NEW_VALUE_INDEX,
 	};
 
+	bool get_by_property_name(const String &p_name, Variant &r_ret) const;
 	void set_dict(const Dictionary &p_dict);
 	Dictionary get_dict();
 
@@ -82,6 +88,7 @@ public:
 
 	String get_label_for_index(int p_index);
 	String get_property_name_for_index(int p_index);
+	String get_key_name_for_index(int p_index);
 
 	EditorPropertyDictionaryObject();
 };
@@ -108,11 +115,12 @@ class EditorPropertyArray : public EditorProperty {
 
 	PopupMenu *change_type = nullptr;
 
+	bool preview_value = false;
 	int page_length = 20;
 	int page_index = 0;
-	int changing_type_index;
+	int changing_type_index = EditorPropertyArrayObject::NOT_CHANGING_TYPE;
 	Button *edit = nullptr;
-	MarginContainer *container = nullptr;
+	PanelContainer *container = nullptr;
 	VBoxContainer *property_vbox = nullptr;
 	EditorSpinSlider *size_slider = nullptr;
 	Button *button_add_item = nullptr;
@@ -135,13 +143,14 @@ class EditorPropertyArray : public EditorProperty {
 	void _reorder_button_up();
 	void _create_new_property_slot();
 
+	Node *get_base_node();
+
 protected:
 	Ref<EditorPropertyArrayObject> object;
 
 	bool updating = false;
 	bool dropping = false;
 
-	static void _bind_methods();
 	void _notification(int p_what);
 
 	virtual void _add_element();
@@ -161,7 +170,9 @@ protected:
 
 public:
 	void setup(Variant::Type p_array_type, const String &p_hint_string = "");
+	void set_preview_value(bool p_preview_value);
 	virtual void update_property() override;
+	virtual bool is_colored(ColorationMode p_mode) override;
 	EditorPropertyArray();
 };
 
@@ -173,13 +184,18 @@ class EditorPropertyDictionary : public EditorProperty {
 		HBoxContainer *container = nullptr;
 		int index = -1;
 		Variant::Type type = Variant::VARIANT_MAX;
+		Variant::Type key_type = Variant::VARIANT_MAX;
 		bool as_id = false;
+		bool key_as_id = false;
 		EditorProperty *prop = nullptr;
+		EditorProperty *prop_key = nullptr;
 		String prop_name;
+		String key_name;
 
 		void set_index(int p_idx) {
 			index = p_idx;
 			prop_name = object->get_property_name_for_index(p_idx);
+			key_name = object->get_key_name_for_index(p_idx);
 			update_prop_or_index();
 		}
 
@@ -190,27 +206,40 @@ class EditorPropertyDictionary : public EditorProperty {
 			update_prop_or_index();
 		}
 
+		void set_key_prop(EditorProperty *p_prop) {
+			if (prop_key) {
+				prop_key->add_sibling(p_prop);
+				prop_key->queue_free();
+				prop_key = p_prop;
+				update_prop_or_index();
+			}
+		}
+
 		void update_prop_or_index() {
 			prop->set_object_and_property(object.ptr(), prop_name);
-			prop->set_label(object->get_label_for_index(index));
+			if (prop_key) {
+				prop_key->set_object_and_property(object.ptr(), key_name);
+			} else {
+				prop->set_label(object->get_label_for_index(index));
+			}
 		}
 	};
 
 	PopupMenu *change_type = nullptr;
 	bool updating = false;
 
+	bool preview_value = false;
 	Ref<EditorPropertyDictionaryObject> object;
 	int page_length = 20;
 	int page_index = 0;
-	int changing_type_index;
+	int changing_type_index = EditorPropertyDictionaryObject::NOT_CHANGING_TYPE;
 	Button *edit = nullptr;
-	MarginContainer *container = nullptr;
+	PanelContainer *container = nullptr;
 	VBoxContainer *property_vbox = nullptr;
 	PanelContainer *add_panel = nullptr;
 	EditorSpinSlider *size_sliderv = nullptr;
 	Button *button_add_item = nullptr;
 	EditorPaginator *paginator = nullptr;
-	PropertyHint property_hint;
 	LocalVector<Slot> slots;
 	void _create_new_property_slot(int p_idx);
 
@@ -222,14 +251,24 @@ class EditorPropertyDictionary : public EditorProperty {
 
 	void _add_key_value();
 	void _object_id_selected(const StringName &p_property, ObjectID p_id);
+	void _remove_pressed(int p_slot_index);
+
+	Variant::Type key_subtype;
+	PropertyHint key_subtype_hint;
+	String key_subtype_hint_string;
+	Variant::Type value_subtype;
+	PropertyHint value_subtype_hint;
+	String value_subtype_hint_string;
+	void initialize_dictionary(Variant &p_dictionary);
 
 protected:
-	static void _bind_methods();
 	void _notification(int p_what);
 
 public:
-	void setup(PropertyHint p_hint);
+	void setup(PropertyHint p_hint, const String &p_hint_string = "");
+	void set_preview_value(bool p_preview_value);
 	virtual void update_property() override;
+	virtual bool is_colored(ColorationMode p_mode) override;
 	EditorPropertyDictionary();
 };
 
@@ -260,7 +299,6 @@ class EditorPropertyLocalizableString : public EditorProperty {
 	void _object_id_selected(const StringName &p_property, ObjectID p_id);
 
 protected:
-	static void _bind_methods();
 	void _notification(int p_what);
 
 public:

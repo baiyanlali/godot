@@ -38,7 +38,7 @@ class String;
 struct Rect2i;
 struct Transform2D;
 
-struct _NO_DISCARD_ Rect2 {
+struct [[nodiscard]] Rect2 {
 	Point2 position;
 	Size2 size;
 
@@ -278,20 +278,22 @@ struct _NO_DISCARD_ Rect2 {
 	}
 
 	_FORCE_INLINE_ Rect2 abs() const {
-		return Rect2(position + size.min(Point2()), size.abs());
+		return Rect2(position + size.minf(0), size.abs());
 	}
 
 	_FORCE_INLINE_ Rect2 round() const {
 		return Rect2(position.round(), size.round());
 	}
 
-	Vector2 get_support(const Vector2 &p_normal) const {
-		Vector2 half_extents = size * 0.5f;
-		Vector2 ofs = position + half_extents;
-		return Vector2(
-					   (p_normal.x > 0) ? -half_extents.x : half_extents.x,
-					   (p_normal.y > 0) ? -half_extents.y : half_extents.y) +
-				ofs;
+	Vector2 get_support(const Vector2 &p_direction) const {
+		Vector2 support = position;
+		if (p_direction.x > 0.0f) {
+			support.x += size.x;
+		}
+		if (p_direction.y > 0.0f) {
+			support.y += size.y;
+		}
+		return support;
 	}
 
 	_FORCE_INLINE_ bool intersects_filled_polygon(const Vector2 *p_points, int p_point_count) const {
@@ -307,14 +309,14 @@ struct _NO_DISCARD_ Rect2 {
 			i_f = i;
 
 			Vector2 r = (b - a);
-			float l = r.length();
+			const real_t l = r.length();
 			if (l == 0.0f) {
 				continue;
 			}
 
 			// Check inside.
 			Vector2 tg = r.orthogonal();
-			float s = tg.dot(center) - tg.dot(a);
+			const real_t s = tg.dot(center) - tg.dot(a);
 			if (s < 0.0f) {
 				side_plus++;
 			} else {
@@ -330,8 +332,8 @@ struct _NO_DISCARD_ Rect2 {
 			Vector2 t13 = (position - a) * ir;
 			Vector2 t24 = (end - a) * ir;
 
-			float tmin = MAX(MIN(t13.x, t24.x), MIN(t13.y, t24.y));
-			float tmax = MIN(MAX(t13.x, t24.x), MAX(t13.y, t24.y));
+			const real_t tmin = MAX(MIN(t13.x, t24.x), MIN(t13.y, t24.y));
+			const real_t tmax = MIN(MAX(t13.x, t24.x), MAX(t13.y, t24.y));
 
 			// if tmax < 0, ray (line) is intersecting AABB, but the whole AABB is behind us
 			if (tmax < 0 || tmin > tmax || tmin >= l) {

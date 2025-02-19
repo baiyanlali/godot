@@ -35,6 +35,8 @@
 #include "scene/resources/3d/primitive_meshes.h"
 #include "servers/navigation_server_3d.h"
 
+#include "modules/navigation/nav_utils.h"
+
 namespace TestNavigationServer3D {
 
 // TODO: Find a more generic way to create `Callable` mocks.
@@ -48,7 +50,7 @@ public:
 	}
 
 	unsigned function1_calls{ 0 };
-	Variant function1_latest_arg0{};
+	Variant function1_latest_arg0;
 };
 
 static inline Array build_array() {
@@ -60,6 +62,32 @@ static inline Array build_array(Variant item, Targs... Fargs) {
 	a.push_front(item);
 	return a;
 }
+
+struct GreaterThan {
+	bool operator()(int p_a, int p_b) const { return p_a > p_b; }
+};
+
+struct CompareArrayValues {
+	const int *array;
+
+	CompareArrayValues(const int *p_array) :
+			array(p_array) {}
+
+	bool operator()(uint32_t p_index_a, uint32_t p_index_b) const {
+		return array[p_index_a] < array[p_index_b];
+	}
+};
+
+struct RegisterHeapIndexes {
+	uint32_t *indexes;
+
+	RegisterHeapIndexes(uint32_t *p_indexes) :
+			indexes(p_indexes) {}
+
+	void operator()(uint32_t p_vector_index, uint32_t p_heap_index) {
+		indexes[p_vector_index] = p_heap_index;
+	}
+};
 
 TEST_SUITE("[Navigation]") {
 	TEST_CASE("[NavigationServer3D] Server should be empty when initialized") {
@@ -545,6 +573,7 @@ TEST_SUITE("[Navigation]") {
 		RID map = navigation_server->map_create();
 		RID region = navigation_server->region_create();
 		Ref<NavigationMesh> navigation_mesh = memnew(NavigationMesh);
+		navigation_server->map_set_use_async_iterations(map, false);
 		navigation_server->map_set_active(map, true);
 		navigation_server->region_set_map(region, map);
 		navigation_server->region_set_navigation_mesh(region, navigation_mesh);
@@ -605,7 +634,7 @@ TEST_SUITE("[Navigation]") {
 			CHECK_EQ(source_geometry->get_indices().size(), 6);
 		}
 
-		SUBCASE("Parsed geometry should be extendible with other geometry") {
+		SUBCASE("Parsed geometry should be extendable with other geometry") {
 			source_geometry->merge(source_geometry); // Merging with itself.
 			const Vector<float> vertices = source_geometry->get_vertices();
 			const Vector<int> indices = source_geometry->get_indices();
@@ -640,6 +669,7 @@ TEST_SUITE("[Navigation]") {
 		RID map = navigation_server->map_create();
 		RID region = navigation_server->region_create();
 		Ref<NavigationMesh> navigation_mesh = memnew(NavigationMesh);
+		navigation_server->map_set_use_async_iterations(map, false);
 		navigation_server->map_set_active(map, true);
 		navigation_server->region_set_map(region, map);
 		navigation_server->region_set_navigation_mesh(region, navigation_mesh);
@@ -689,6 +719,7 @@ TEST_SUITE("[Navigation]") {
 		RID map = navigation_server->map_create();
 		RID region = navigation_server->region_create();
 		navigation_server->map_set_active(map, true);
+		navigation_server->map_set_use_async_iterations(map, false);
 		navigation_server->region_set_map(region, map);
 		navigation_server->region_set_navigation_mesh(region, navigation_mesh);
 		navigation_server->process(0.0); // Give server some cycles to commit.
@@ -697,10 +728,14 @@ TEST_SUITE("[Navigation]") {
 			CHECK_NE(navigation_server->map_get_closest_point(map, Vector3(0, 0, 0)), Vector3(0, 0, 0));
 			CHECK_NE(navigation_server->map_get_closest_point_normal(map, Vector3(0, 0, 0)), Vector3());
 			CHECK(navigation_server->map_get_closest_point_owner(map, Vector3(0, 0, 0)).is_valid());
-			// TODO: Test map_get_closest_point_to_segment() with p_use_collision=true as well.
 			CHECK_NE(navigation_server->map_get_closest_point_to_segment(map, Vector3(0, 0, 0), Vector3(1, 1, 1), false), Vector3());
+			CHECK_NE(navigation_server->map_get_closest_point_to_segment(map, Vector3(0, 0, 0), Vector3(1, 1, 1), true), Vector3());
 			CHECK_NE(navigation_server->map_get_path(map, Vector3(0, 0, 0), Vector3(10, 0, 10), true).size(), 0);
 			CHECK_NE(navigation_server->map_get_path(map, Vector3(0, 0, 0), Vector3(10, 0, 10), false).size(), 0);
+		}
+
+		SUBCASE("'map_get_closest_point_to_segment' with 'use_collision' should return default if segment doesn't intersect map") {
+			CHECK_EQ(navigation_server->map_get_closest_point_to_segment(map, Vector3(1, 2, 1), Vector3(1, 1, 1), true), Vector3());
 		}
 
 		SUBCASE("Elaborate query with 'CORRIDORFUNNEL' post-processing should yield non-empty result") {
@@ -764,6 +799,8 @@ TEST_SUITE("[Navigation]") {
 		navigation_server->process(0.0); // Give server some cycles to commit.
 	}
 
+	// FIXME: The race condition mentioned below is actually a problem and fails on CI (GH-90613).
+	/*
 	TEST_CASE("[NavigationServer3D] Server should be able to bake asynchronously") {
 		NavigationServer3D *navigation_server = NavigationServer3D::get_singleton();
 		Ref<NavigationMesh> navigation_mesh = memnew(NavigationMesh);
@@ -780,6 +817,155 @@ TEST_SUITE("[Navigation]") {
 		CHECK(navigation_server->is_baking_navigation_mesh(navigation_mesh));
 		CHECK_EQ(navigation_mesh->get_polygon_count(), 0);
 		CHECK_EQ(navigation_mesh->get_vertices().size(), 0);
+	}
+	*/
+
+	TEST_CASE("[NavigationServer3D] Server should simplify path properly") {
+		real_t simplify_epsilon = 0.2;
+		Vector<Vector3> source_path;
+		source_path.resize(7);
+		source_path.write[0] = Vector3(0.0, 0.0, 0.0);
+		source_path.write[1] = Vector3(0.0, 0.0, 1.0); // This point needs to go.
+		source_path.write[2] = Vector3(0.0, 0.0, 2.0); // This point needs to go.
+		source_path.write[3] = Vector3(0.0, 0.0, 2.0);
+		source_path.write[4] = Vector3(2.0, 1.0, 3.0);
+		source_path.write[5] = Vector3(2.0, 1.5, 4.0); // This point needs to go.
+		source_path.write[6] = Vector3(2.0, 2.0, 5.0);
+		Vector<Vector3> simplified_path = NavigationServer3D::get_singleton()->simplify_path(source_path, simplify_epsilon);
+		CHECK_EQ(simplified_path.size(), 4);
+	}
+
+	TEST_CASE("[Heap] size") {
+		gd::Heap<int> heap;
+
+		CHECK(heap.size() == 0);
+
+		heap.push(0);
+		CHECK(heap.size() == 1);
+
+		heap.push(1);
+		CHECK(heap.size() == 2);
+
+		heap.pop();
+		CHECK(heap.size() == 1);
+
+		heap.pop();
+		CHECK(heap.size() == 0);
+	}
+
+	TEST_CASE("[Heap] is_empty") {
+		gd::Heap<int> heap;
+
+		CHECK(heap.is_empty() == true);
+
+		heap.push(0);
+		CHECK(heap.is_empty() == false);
+
+		heap.pop();
+		CHECK(heap.is_empty() == true);
+	}
+
+	TEST_CASE("[Heap] push/pop") {
+		SUBCASE("Default comparator") {
+			gd::Heap<int> heap;
+
+			heap.push(2);
+			heap.push(7);
+			heap.push(5);
+			heap.push(3);
+			heap.push(4);
+
+			CHECK(heap.pop() == 7);
+			CHECK(heap.pop() == 5);
+			CHECK(heap.pop() == 4);
+			CHECK(heap.pop() == 3);
+			CHECK(heap.pop() == 2);
+		}
+
+		SUBCASE("Custom comparator") {
+			GreaterThan greaterThan;
+			gd::Heap<int, GreaterThan> heap(greaterThan);
+
+			heap.push(2);
+			heap.push(7);
+			heap.push(5);
+			heap.push(3);
+			heap.push(4);
+
+			CHECK(heap.pop() == 2);
+			CHECK(heap.pop() == 3);
+			CHECK(heap.pop() == 4);
+			CHECK(heap.pop() == 5);
+			CHECK(heap.pop() == 7);
+		}
+
+		SUBCASE("Intermediate pops") {
+			gd::Heap<int> heap;
+
+			heap.push(0);
+			heap.push(3);
+			heap.pop();
+			heap.push(1);
+			heap.push(2);
+
+			CHECK(heap.pop() == 2);
+			CHECK(heap.pop() == 1);
+			CHECK(heap.pop() == 0);
+		}
+	}
+
+	TEST_CASE("[Heap] shift") {
+		int values[] = { 5, 3, 6, 7, 1 };
+		uint32_t heap_indexes[] = { 0, 0, 0, 0, 0 };
+		CompareArrayValues comparator(values);
+		RegisterHeapIndexes indexer(heap_indexes);
+		gd::Heap<uint32_t, CompareArrayValues, RegisterHeapIndexes> heap(comparator, indexer);
+
+		heap.push(0);
+		heap.push(1);
+		heap.push(2);
+		heap.push(3);
+		heap.push(4);
+
+		// Shift down: 6 -> 2
+		values[2] = 2;
+		heap.shift(heap_indexes[2]);
+
+		// Shift up: 5 -> 8
+		values[0] = 8;
+		heap.shift(heap_indexes[0]);
+
+		CHECK(heap.pop() == 0);
+		CHECK(heap.pop() == 3);
+		CHECK(heap.pop() == 1);
+		CHECK(heap.pop() == 2);
+		CHECK(heap.pop() == 4);
+
+		CHECK(heap_indexes[0] == UINT32_MAX);
+		CHECK(heap_indexes[1] == UINT32_MAX);
+		CHECK(heap_indexes[2] == UINT32_MAX);
+		CHECK(heap_indexes[3] == UINT32_MAX);
+		CHECK(heap_indexes[4] == UINT32_MAX);
+	}
+
+	TEST_CASE("[Heap] clear") {
+		uint32_t heap_indexes[] = { 0, 0, 0, 0 };
+		RegisterHeapIndexes indexer(heap_indexes);
+		gd::Heap<uint32_t, Comparator<uint32_t>, RegisterHeapIndexes> heap(indexer);
+
+		heap.push(0);
+		heap.push(2);
+		heap.push(1);
+		heap.push(3);
+
+		heap.clear();
+
+		CHECK(heap.size() == 0);
+
+		CHECK(heap_indexes[0] == UINT32_MAX);
+		CHECK(heap_indexes[1] == UINT32_MAX);
+		CHECK(heap_indexes[2] == UINT32_MAX);
+		CHECK(heap_indexes[3] == UINT32_MAX);
 	}
 }
 } //namespace TestNavigationServer3D

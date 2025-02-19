@@ -32,7 +32,7 @@
 #define AUDIO_STREAM_INTERACTIVE_EDITOR_PLUGIN_H
 
 #include "editor/editor_inspector.h"
-#include "editor/editor_plugin.h"
+#include "editor/plugins/editor_plugin.h"
 #include "scene/gui/dialogs.h"
 
 class CheckBox;
@@ -102,7 +102,7 @@ class AudioStreamInteractiveEditorPlugin : public EditorPlugin {
 	GDCLASS(AudioStreamInteractiveEditorPlugin, EditorPlugin);
 
 public:
-	virtual String get_name() const override { return "AudioStreamInteractive"; }
+	virtual String get_plugin_name() const override { return "AudioStreamInteractive"; }
 
 	AudioStreamInteractiveEditorPlugin();
 };

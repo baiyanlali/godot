@@ -31,10 +31,9 @@
 #ifndef GDSCRIPT_LANGUAGE_SERVER_H
 #define GDSCRIPT_LANGUAGE_SERVER_H
 
-#include "../gdscript_parser.h"
 #include "gdscript_language_protocol.h"
 
-#include "editor/editor_plugin.h"
+#include "editor/plugins/editor_plugin.h"
 
 class GDScriptLanguageServer : public EditorPlugin {
 	GDCLASS(GDScriptLanguageServer, EditorPlugin);

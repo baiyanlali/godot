@@ -31,7 +31,7 @@
 #include "camera_2d.h"
 
 #include "core/config/project_settings.h"
-#include "scene/main/window.h"
+#include "scene/main/viewport.h"
 
 bool Camera2D::_is_editing_in_editor() const {
 #ifdef TOOLS_ENABLED
@@ -54,16 +54,18 @@ void Camera2D::_update_scroll() {
 	if (is_current()) {
 		ERR_FAIL_COND(custom_viewport && !ObjectDB::get_instance(custom_viewport_id));
 
+		Size2 screen_size = _get_camera_screen_size();
+
 		Transform2D xform;
 		if (is_physics_interpolated_and_enabled()) {
 			xform = _interpolation_data.xform_prev.interpolate_with(_interpolation_data.xform_curr, Engine::get_singleton()->get_physics_interpolation_fraction());
+			camera_screen_center = xform.affine_inverse().xform(0.5 * screen_size);
 		} else {
 			xform = get_camera_transform();
 		}
 
 		viewport->set_canvas_transform(xform);
 
-		Size2 screen_size = _get_camera_screen_size();
 		Point2 screen_offset = (anchor_mode == ANCHOR_MODE_DRAG_CENTER ? (screen_size * 0.5) : Point2());
 		Point2 adj_screen_pos = camera_screen_center - (screen_size * 0.5);
 
@@ -71,6 +73,14 @@ void Camera2D::_update_scroll() {
 		get_tree()->call_group(group_name, SNAME("_camera_moved"), xform, screen_offset, adj_screen_pos);
 	}
 }
+
+#ifdef TOOLS_ENABLED
+void Camera2D::_project_settings_changed() {
+	if (screen_drawing_enabled) {
+		queue_redraw();
+	}
+}
+#endif
 
 void Camera2D::_update_process_callback() {
 	if (is_physics_interpolated_and_enabled()) {
@@ -105,11 +115,11 @@ void Camera2D::set_zoom(const Vector2 &p_zoom) {
 	Point2 old_smoothed_camera_pos = smoothed_camera_pos;
 	_update_scroll();
 	smoothed_camera_pos = old_smoothed_camera_pos;
-};
+}
 
 Vector2 Camera2D::get_zoom() const {
 	return zoom;
-};
+}
 
 Transform2D Camera2D::get_camera_transform() {
 	if (!get_tree()) {
@@ -265,6 +275,14 @@ void Camera2D::_ensure_update_interpolation_data() {
 
 void Camera2D::_notification(int p_what) {
 	switch (p_what) {
+#ifdef TOOLS_ENABLED
+		case NOTIFICATION_READY: {
+			if (is_part_of_edited_scene()) {
+				ProjectSettings::get_singleton()->connect(SNAME("settings_changed"), callable_mp(this, &Camera2D::_project_settings_changed));
+			}
+		} break;
+#endif
+
 		case NOTIFICATION_INTERNAL_PROCESS: {
 			_update_scroll();
 		} break;
@@ -282,6 +300,14 @@ void Camera2D::_notification(int p_what) {
 			// Force the limits etc. to update.
 			_interpolation_data.xform_curr = get_camera_transform();
 			_interpolation_data.xform_prev = _interpolation_data.xform_curr;
+			_update_process_callback();
+		} break;
+
+		case NOTIFICATION_SUSPENDED:
+		case NOTIFICATION_PAUSED: {
+			if (is_physics_interpolated_and_enabled()) {
+				_update_scroll();
+			}
 		} break;
 
 		case NOTIFICATION_TRANSFORM_CHANGED: {
@@ -290,7 +316,9 @@ void Camera2D::_notification(int p_what) {
 			}
 			if (is_physics_interpolated_and_enabled()) {
 				_ensure_update_interpolation_data();
-				_interpolation_data.xform_curr = get_camera_transform();
+				if (Engine::get_singleton()->is_in_physics_frame()) {
+					_interpolation_data.xform_curr = get_camera_transform();
+				}
 			}
 		} break;
 
@@ -363,7 +391,7 @@ void Camera2D::_notification(int p_what) {
 					inv_camera_transform.xform(Vector2(0, screen_size.height))
 				};
 
-				Transform2D inv_transform = get_global_transform().affine_inverse(); // undo global space
+				Transform2D inv_transform = get_global_transform().affine_inverse(); // Undo global space.
 
 				for (int i = 0; i < 4; i++) {
 					draw_line(inv_transform.xform(screen_endpoints[i]), inv_transform.xform(screen_endpoints[(i + 1) % 4]), area_axis_color, area_axis_width);
@@ -377,13 +405,13 @@ void Camera2D::_notification(int p_what) {
 					limit_drawing_width = 3;
 				}
 
-				Vector2 camera_origin = get_global_position();
-				Vector2 camera_scale = get_global_scale().abs();
+				Transform2D inv_transform = get_global_transform().affine_inverse();
+
 				Vector2 limit_points[4] = {
-					(Vector2(limit[SIDE_LEFT], limit[SIDE_TOP]) - camera_origin) / camera_scale,
-					(Vector2(limit[SIDE_RIGHT], limit[SIDE_TOP]) - camera_origin) / camera_scale,
-					(Vector2(limit[SIDE_RIGHT], limit[SIDE_BOTTOM]) - camera_origin) / camera_scale,
-					(Vector2(limit[SIDE_LEFT], limit[SIDE_BOTTOM]) - camera_origin) / camera_scale
+					inv_transform.xform(Vector2(limit[SIDE_LEFT], limit[SIDE_TOP])),
+					inv_transform.xform(Vector2(limit[SIDE_RIGHT], limit[SIDE_TOP])),
+					inv_transform.xform(Vector2(limit[SIDE_RIGHT], limit[SIDE_BOTTOM])),
+					inv_transform.xform(Vector2(limit[SIDE_LEFT], limit[SIDE_BOTTOM]))
 				};
 
 				for (int i = 0; i < 4; i++) {
@@ -408,7 +436,7 @@ void Camera2D::_notification(int p_what) {
 					inv_camera_transform.xform(Vector2((screen_size.width / 2) - ((screen_size.width / 2) * drag_margin[SIDE_LEFT]), (screen_size.height / 2) + ((screen_size.height / 2) * drag_margin[SIDE_BOTTOM])))
 				};
 
-				Transform2D inv_transform = get_global_transform().affine_inverse(); // undo global space
+				Transform2D inv_transform = get_global_transform().affine_inverse(); // Undo global space.
 
 				for (int i = 0; i < 4; i++) {
 					draw_line(inv_transform.xform(margin_endpoints[i]), inv_transform.xform(margin_endpoints[(i + 1) % 4]), margin_drawing_color, margin_drawing_width);
@@ -627,7 +655,7 @@ void Camera2D::align() {
 }
 
 void Camera2D::set_position_smoothing_speed(real_t p_speed) {
-	position_smoothing_speed = p_speed;
+	position_smoothing_speed = MAX(0, p_speed);
 	_update_process_internal_for_smoothing();
 }
 
@@ -636,7 +664,7 @@ real_t Camera2D::get_position_smoothing_speed() const {
 }
 
 void Camera2D::set_rotation_smoothing_speed(real_t p_speed) {
-	rotation_smoothing_speed = p_speed;
+	rotation_smoothing_speed = MAX(0, p_speed);
 	_update_process_internal_for_smoothing();
 }
 
@@ -877,7 +905,7 @@ void Camera2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_margin_drawing_enabled"), &Camera2D::is_margin_drawing_enabled);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "offset", PROPERTY_HINT_NONE, "suffix:px"), "set_offset", "get_offset");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "anchor_mode", PROPERTY_HINT_ENUM, "Fixed TopLeft,Drag Center"), "set_anchor_mode", "get_anchor_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "anchor_mode", PROPERTY_HINT_ENUM, "Fixed Top Left,Drag Center"), "set_anchor_mode", "get_anchor_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ignore_rotation"), "set_ignore_rotation", "is_ignoring_rotation");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enabled"), "set_enabled", "is_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "zoom", PROPERTY_HINT_LINK), "set_zoom", "get_zoom");

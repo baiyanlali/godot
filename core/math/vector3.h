@@ -39,7 +39,7 @@ struct Basis;
 struct Vector2;
 struct Vector3i;
 
-struct _NO_DISCARD_ Vector3 {
+struct [[nodiscard]] Vector3 {
 	static const int AXIS_COUNT = 3;
 
 	enum Axis {
@@ -80,8 +80,16 @@ struct _NO_DISCARD_ Vector3 {
 		return Vector3(MIN(x, p_vector3.x), MIN(y, p_vector3.y), MIN(z, p_vector3.z));
 	}
 
+	Vector3 minf(real_t p_scalar) const {
+		return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
+	}
+
 	Vector3 max(const Vector3 &p_vector3) const {
 		return Vector3(MAX(x, p_vector3.x), MAX(y, p_vector3.y), MAX(z, p_vector3.z));
+	}
+
+	Vector3 maxf(real_t p_scalar) const {
+		return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
 	}
 
 	_FORCE_INLINE_ real_t length() const;
@@ -96,7 +104,9 @@ struct _NO_DISCARD_ Vector3 {
 	_FORCE_INLINE_ void zero();
 
 	void snap(const Vector3 &p_step);
+	void snapf(real_t p_step);
 	Vector3 snapped(const Vector3 &p_step) const;
+	Vector3 snappedf(real_t p_step) const;
 
 	void rotate(const Vector3 &p_axis, real_t p_angle);
 	Vector3 rotated(const Vector3 &p_axis, real_t p_angle) const;
@@ -120,6 +130,7 @@ struct _NO_DISCARD_ Vector3 {
 	_FORCE_INLINE_ Vector3 cross(const Vector3 &p_with) const;
 	_FORCE_INLINE_ real_t dot(const Vector3 &p_with) const;
 	Basis outer(const Vector3 &p_with) const;
+	_FORCE_INLINE_ Vector3 get_any_perpendicular() const;
 
 	_FORCE_INLINE_ Vector3 abs() const;
 	_FORCE_INLINE_ Vector3 floor() const;
@@ -127,6 +138,7 @@ struct _NO_DISCARD_ Vector3 {
 	_FORCE_INLINE_ Vector3 ceil() const;
 	_FORCE_INLINE_ Vector3 round() const;
 	Vector3 clamp(const Vector3 &p_min, const Vector3 &p_max) const;
+	Vector3 clampf(real_t p_min, real_t p_max) const;
 
 	_FORCE_INLINE_ real_t distance_to(const Vector3 &p_to) const;
 	_FORCE_INLINE_ real_t distance_squared_to(const Vector3 &p_to) const;
@@ -313,6 +325,16 @@ Vector3 Vector3::direction_to(const Vector3 &p_to) const {
 	Vector3 ret(p_to.x - x, p_to.y - y, p_to.z - z);
 	ret.normalize();
 	return ret;
+}
+
+Vector3 Vector3::get_any_perpendicular() const {
+	// Return the any perpendicular vector by cross product with the Vector3.RIGHT or Vector3.UP,
+	// whichever has the greater angle to the current vector with the sign of each element positive.
+	// The only essence is "to avoid being parallel to the current vector", and there is no mathematical basis for using Vector3.RIGHT and Vector3.UP,
+	// since it could be a different vector depending on the prior branching code Math::abs(x) <= Math::abs(y) && Math::abs(x) <= Math::abs(z).
+	// However, it would be reasonable to use any of the axes of the basis, as it is simpler to calculate.
+	ERR_FAIL_COND_V_MSG(is_zero_approx(), Vector3(0, 0, 0), "The Vector3 must not be zero.");
+	return cross((Math::abs(x) <= Math::abs(y) && Math::abs(x) <= Math::abs(z)) ? Vector3(1, 0, 0) : Vector3(0, 1, 0)).normalized();
 }
 
 /* Operators */
